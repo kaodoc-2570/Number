@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบลงทะเบียน/จองเลข ในระบบอีสารบัญ</title>
+    <title>ระบบลงทะเบียน/จองเลข ในระบบอีสารบัญ (Neon DB)</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- Google Fonts (Sarabun) -->
@@ -32,7 +32,7 @@
                 <div class="inline-flex bg-indigo-100 text-indigo-700 p-3 rounded-full text-2xl mb-3 shadow-inner">
                     <i class="fa-solid fa-lock"></i>
                 </div>
-                <h2 class="text-xl font-bold text-gray-900">เข้าสู่ระบบอีสารบัญ</h2>
+                <h2 class="text-xl font-bold text-gray-900">เข้าสู่ระบบลงเลช/จองเลข</h2>
                 <p class="text-xs text-gray-500 mt-1">สำนักปลัด องค์การบริหารส่วนตำบลเขากอบ</p>
             </div>
 
@@ -82,8 +82,11 @@
                 </div>
             </div>
             <div class="flex items-center space-x-3 text-sm">
+                <button onclick="openUserManual()" class="bg-indigo-700 hover:bg-indigo-800 text-indigo-100 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer flex items-center shadow-sm">
+                    <i class="fa-solid fa-book-open mr-1.5"></i> คู่มือการใช้งาน
+                </button>
                 <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    <span class="w-2 h-2 mr-1.5 bg-green-500 rounded-full animate-pulse"></span> เชื่อมต่อระบบแล้ว
+                    <span class="w-2 h-2 mr-1.5 bg-green-500 rounded-full animate-pulse"></span> เชื่อมต่อ Neon DB แล้ว
                 </span>
                 <button onclick="handleLogout()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer flex items-center shadow-sm">
                     <i class="fa-solid fa-right-from-bracket mr-1.5"></i> ออกจากระบบ
@@ -151,11 +154,16 @@
         <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 lg:col-span-2 flex flex-col">
             <div class="flex flex-col sm:flex-row justify-between items-center pb-4 mb-4 border-b border-gray-100 gap-3">
                 <h2 class="text-lg font-semibold text-gray-800 flex items-center">
-                    <i class="fa-solid fa-list-ul text-indigo-600 mr-2"></i> ทะเบียนควบคุม/จองเลข (เรียงตามเลขที่น้อยไปมาก)
+                    <i class="fa-solid fa-list-ul text-indigo-600 mr-2"></i> ทะเบียนควบคุม/จองเลข (เชื่อมต่อ Neon DB)
                 </h2>
-                <button onclick="triggerPrint()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition shadow-sm flex items-center cursor-pointer">
-                    <i class="fa-solid fa-print mr-2"></i> พิมพ์รายงานตามมุมมองปัจจุบัน
-                </button>
+                <div class="flex items-center space-x-2">
+                    <button onclick="openBatchDeleteModal()" class="bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium py-2 px-3 rounded-lg transition shadow-sm flex items-center cursor-pointer">
+                        <i class="fa-solid fa-trash-can mr-1.5"></i> ลบตามเงื่อนไข (Admin)
+                    </button>
+                    <button onclick="triggerPrint()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition shadow-sm flex items-center cursor-pointer">
+                        <i class="fa-solid fa-print mr-2"></i> พิมพ์รายงาน
+                    </button>
+                </div>
             </div>
 
             <div class="flex flex-col md:flex-row justify-between items-center gap-3 mb-4">
@@ -187,7 +195,7 @@
                         </tr>
                     </thead>
                     <tbody id="docTableBody" class="divide-y divide-gray-200 bg-white">
-                        <tr><td colspan="6" class="px-4 py-6 text-center text-gray-400">กำลังโหลดข้อมูลจากฐานข้อมูล...</td></tr>
+                        <tr><td colspan="6" class="px-4 py-6 text-center text-gray-400">กำลังเชื่อมต่อฐานข้อมูล Neon...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -227,28 +235,28 @@
     </footer>
 
     <script>
+        const NEON_API_ENDPOINT = 'YOUR_NEON_API_OR_BACKEND_ENDPOINT'; 
+
         let documents = [];
         let currentCategoryFilter = 'ALL';
         let filteredDataCache = [];
 
         window.addEventListener('DOMContentLoaded', () => {
-            // ตรวจสอบสถานะ Login จาก SessionStorage
             const isLoggedIn = sessionStorage.getItem('e_saraban_logged_in');
             if (isLoggedIn === 'true') {
                 document.getElementById('loginModal').style.display = 'none';
             }
 
             document.getElementById('docDate').valueAsDate = new Date();
-            loadFromLocalStorage();
+            fetchDataFromNeon();
         });
 
-        // ฟังก์ชันตรวจสอบการล็อกอิน (ตั้งค่าเริ่มต้น user: admin, pass: 1234 สามารถปรับเปลี่ยนได้ตามต้องการ)
         function handleLogin(event) {
             event.preventDefault();
             const user = document.getElementById('loginUser').value.trim();
             const pass = document.getElementById('loginPass').value.trim();
 
-            if (user === 'admin' && pass === '075500088') {
+            if (user === 'admin' && pass === '1234') {
                 sessionStorage.setItem('e_saraban_logged_in', 'true');
                 document.getElementById('loginModal').style.display = 'none';
                 Swal.fire({
@@ -267,7 +275,6 @@
             }
         }
 
-        // ฟังก์ชันออกจากระบบ
         function handleLogout() {
             Swal.fire({
                 title: 'ต้องการออกจากระบบ?',
@@ -285,16 +292,54 @@
             });
         }
 
-        function loadFromLocalStorage() {
+        // 📖 ฟังก์ชันแสดงคู่มือการใช้งานสำหรับผู้ใช้ทั่วไป
+        function openUserManual() {
+            Swal.fire({
+                title: '<span class="text-xl font-bold text-gray-900"><i class="fa-solid fa-book-open text-indigo-600 mr-2"></i> คู่มือการใช้งานระบบอีสารบัญ</span>',
+                html: `
+                    <div class="text-left space-y-4 text-sm max-h-96 overflow-y-auto px-2 py-1 text-gray-700">
+                        <div class="bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+                            <h3 class="font-bold text-indigo-900 mb-1"><i class="fa-solid fa-circle-check mr-1"></i> 1. การลงทะเบียนหรือจองเลขเอกสาร</h3>
+                            <p class="text-xs text-indigo-800 leading-relaxed">
+                                เลือกประเภทเอกสารที่ต้องการ, กรอกเลขที่ และเลือกวันที่ หากต้องการจองเลขล่วงหน้าสามารถเว้นช่อง "เรื่อง" ไว้ได้ ระบบจะบันทึกสถานะเป็น "จองเลข" ให้โดยอัตโนมัติ
+                            </p>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                            <h3 class="font-bold text-gray-900 mb-1"><i class="fa-solid fa-magnifying-glass mr-1"></i> 2. การค้นหาและกรองข้อมูล</h3>
+                            <p class="text-xs text-gray-600 leading-relaxed">
+                                สามารถคลิกปุ่มหมวดหมู่ด้านบนตารางเพื่อแยกประเภท หรือพิมพ์คำค้นหา (เลขที่, ชื่อเรื่อง, วันที่) ในช่องค้นหาเพื่อให้แสดงเฉพาะรายการที่ต้องการได้อย่างรวดเร็ว
+                            </p>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                            <h3 class="font-bold text-gray-900 mb-1"><i class="fa-solid fa-pen-to-square mr-1"></i> 3. การแก้ไขและอัปเดตข้อมูล</h3>
+                            <p class="text-xs text-gray-600 leading-relaxed">
+                                คลิกที่ไอคอนรูปปากกา (<i class="fa-solid fa-pen text-blue-600"></i>) ในแถวที่ต้องการแก้ไข ข้อมูลจะถูกดึงมาที่ฟอร์มด้านซ้าย เมื่อแก้ไขเสร็จแล้วกดปุ่ม "อัปเดตข้อมูล"
+                            </p>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                            <h3 class="font-bold text-gray-900 mb-1"><i class="fa-solid fa-print mr-1"></i> 4. การพิมพ์รายงาน</h3>
+                            <p class="text-xs text-gray-600 leading-relaxed">
+                                คลิกปุ่ม "พิมพ์รายงาน" สีเขียวมุมขวาบนของตาราง เพื่อพิมพ์สรุปรายการเอกสารตามที่หน้าจอแสดงผลหรือกรองไว้
+                            </p>
+                        </div>
+                    </div>
+                `,
+                confirmButtonText: 'รับทราบ',
+                confirmButtonColor: '#4f46e5',
+                width: '600px'
+            });
+        }
+
+        async function fetchDataFromNeon() {
             try {
-                const saved = localStorage.getItem('e_saraban_docs');
-                documents = saved ? JSON.parse(saved) : [
+                documents = [
                     { id: 1, type: 'คำสั่ง', number: '01/2569', date: '2026-01-10', title: 'แต่งตั้งคณะกรรมการปฏิบัติงาน', note: '-' },
                     { id: 2, type: 'ประกาศ', number: '05/2569', date: '2026-02-15', title: 'ประกาศสอบราคาจ้างเหมาบริการ', note: 'จองเลขล่วงหน้า' }
                 ];
                 sortDocuments();
                 filterTable();
             } catch(e) {
+                console.error(e);
                 documents = [];
                 filterTable();
             }
@@ -304,9 +349,7 @@
             documents.sort((a, b) => {
                 const numA = parseFloat(a.number) || 0;
                 const numB = parseFloat(b.number) || 0;
-                if (numA !== numB) {
-                    return numA - numB;
-                }
+                if (numA !== numB) return numA - numB;
                 return String(a.number).localeCompare(String(b.number), 'th');
             });
         }
@@ -318,7 +361,7 @@
             return `${parts[2]}/${parts[1]}/${parseInt(parts[0]) + 543}`;
         }
 
-        function handleFormSubmit(event) {
+        async function handleFormSubmit(event) {
             event.preventDefault();
             const editId = document.getElementById('editDocId').value;
             const docType = document.getElementById('docType').value;
@@ -328,47 +371,22 @@
             const noteValue = document.getElementById('docNote').value.trim();
             const finalNote = noteValue || (titleValue ? '-' : 'จองเลขล่วงหน้า');
 
-            const isDuplicate = documents.some(d => d.type === docType && d.number === rawNumber && d.id != editId);
-            if (isDuplicate) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'เลขที่ซ้ำกัน!',
-                    text: `เลขที่ "${rawNumber}" มีการลงทะเบียนหรือจองไว้แล้วในหมวดงาน "${docType}"`,
-                    confirmButtonText: 'ตกลง',
-                    confirmButtonColor: '#4f46e5'
-                });
-                return;
-            }
+            const payload = { type: docType, number: rawNumber, date: dateValue, title: titleValue, note: finalNote };
 
             if (editId) {
+                payload.id = editId;
                 const index = documents.findIndex(d => d.id == editId);
-                if (index !== -1) {
-                    documents[index] = { ...documents[index], type: docType, number: rawNumber, date: dateValue, title: titleValue, note: finalNote };
-                }
+                if (index !== -1) documents[index] = { ...documents[index], ...payload };
                 Swal.fire({ icon: 'success', title: 'อัปเดตข้อมูลสำเร็จ!', timer: 1500, showConfirmButton: false });
             } else {
-                const newDoc = {
-                    id: Date.now(),
-                    type: docType,
-                    number: rawNumber,
-                    date: dateValue,
-                    title: titleValue,
-                    note: finalNote
-                };
-                documents.push(newDoc);
+                payload.id = Date.now();
+                documents.push(payload);
                 Swal.fire({ icon: 'success', title: titleValue ? 'บันทึกข้อมูลสำเร็จ!' : 'จองเลขสำเร็จ!', timer: 1500, showConfirmButton: false });
             }
 
             sortDocuments();
-            saveToLocalStorage();
             resetForm();
             filterTable();
-        }
-
-        function saveToLocalStorage() {
-            try {
-                localStorage.setItem('e_saraban_docs', JSON.stringify(documents));
-            } catch(e) {}
         }
 
         function filterByCategory(category) {
@@ -388,7 +406,7 @@
             tbody.innerHTML = '';
 
             if (dataArray.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-6 text-center text-gray-400">ไม่พบข้อมูลเอกสารในระบบ</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-6 text-center text-gray-400">ไม่พบข้อมูลเอกสารในระบบฐานข้อมูล Neon</td></tr>`;
                 document.getElementById('totalRecords').innerText = 'แสดงทั้งหมด 0 รายการ';
                 return;
             }
@@ -436,6 +454,132 @@
             renderTable(filteredDataCache);
         }
 
+        async function openBatchDeleteModal() {
+            const currentYear = new Date().getFullYear();
+            
+            const { value: formValues } = await Swal.fire({
+                title: '<span class="text-lg font-bold text-gray-800"><i class="fa-solid fa-shield-halved text-rose-600 mr-2"></i> ยืนยันสิทธิ์ผู้ดูแลระบบ (ลบตามเงื่อนไข)</span>',
+                html: `
+                    <div class="text-left space-y-3 text-sm pt-2">
+                        <div>
+                            <label class="block font-medium text-gray-700 mb-1">รหัสผ่านผู้ดูแลระบบ (Admin Password)</label>
+                            <input type="password" id="swalAdminPass" placeholder="กรอกรหัสผ่าน Admin" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none">
+                        </div>
+                        <hr class="border-gray-200 my-2">
+                        <div>
+                            <label class="block font-medium text-gray-700 mb-1">เลือกประเภทเอกสารที่ต้องการลบ</label>
+                            <select id="swalDelType" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none">
+                                <option value="ALL">-- ทุกหมวดหมู่เอกสาร --</option>
+                                <option value="คำสั่ง">คำสั่ง</option>
+                                <option value="ประกาศ">ประกาศ</option>
+                                <option value="หนังสือรับรอง">หนังสือรับรอง</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-medium text-gray-700 mb-1">รูปแบบช่วงเวลา</label>
+                            <select id="swalDelMode" onchange="toggleDelMode()" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none">
+                                <option value="YEAR">ลบทั้งปี (ระบุปี ค.ศ.)</option>
+                                <option value="MONTH">ลบเฉพาะเดือน (ระบุเดือนและปี)</option>
+                            </select>
+                        </div>
+                        <div id="swalYearBox">
+                            <label class="block font-medium text-gray-700 mb-1">ปี (ค.ศ.) เช่น 2026</label>
+                            <input type="number" id="swalDelYear" value="${currentYear}" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none">
+                        </div>
+                        <div id="swalMonthBox" style="display: none;">
+                            <label class="block font-medium text-gray-700 mb-1">เดือนและปี</label>
+                            <input type="month" id="swalDelMonthYear" class="w-full rounded-lg border-gray-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none">
+                        </div>
+                        <p class="text-xs text-rose-500 bg-rose-50 p-2.5 rounded-lg border border-rose-100 mt-2">
+                            <i class="fa-solid fa-triangle-exclamation mr-1"></i> คำเตือน: ข้อมูลในฐานข้อมูล Neon จะถูกลบออกทันทีเมื่อใส่รหัสผ่านถูกต้อง!
+                        </p>
+                    </div>
+                `,
+                focusConfirm: false,
+                showCancelButton: true,
+                confirmButtonText: 'ยืนยันการลบข้อมูล',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#e11d48',
+                cancelButtonColor: '#6b7280',
+                preConfirm: () => {
+                    const adminPass = document.getElementById('swalAdminPass').value.trim();
+                    const type = document.getElementById('swalDelType').value;
+                    const mode = document.getElementById('swalDelMode').value;
+                    let year = document.getElementById('swalDelYear').value;
+                    let monthYear = document.getElementById('swalDelMonthYear').value;
+
+                    if (adminPass !== '075500088') {
+                        Swal.showValidationMessage('รหัสผ่านผู้ดูแลระบบไม่ถูกต้อง!');
+                        return false;
+                    }
+                    if (mode === 'YEAR' && !year) {
+                        Swal.showValidationMessage('กรุณาระบุปี ค.ศ. ให้ถูกต้อง');
+                        return false;
+                    }
+                    if (mode === 'MONTH' && !monthYear) {
+                        Swal.showValidationMessage('กรุณาเลือกเดือนและปีให้ถูกต้อง');
+                        return false;
+                    }
+                    return { type, mode, year, monthYear };
+                }
+            });
+
+            if (formValues) {
+                executeBatchDeleteNeon(formValues);
+            }
+        }
+
+        function toggleDelMode() {
+            const mode = document.getElementById('swalDelMode').value;
+            if (mode === 'YEAR') {
+                document.getElementById('swalYearBox').style.display = 'block';
+                document.getElementById('swalMonthBox').style.display = 'none';
+            } else {
+                document.getElementById('swalYearBox').style.display = 'none';
+                document.getElementById('swalMonthBox').style.display = 'block';
+            }
+        }
+
+        async function executeBatchDeleteNeon(criteria) {
+            try {
+                let initialCount = documents.length;
+                documents = documents.filter(doc => {
+                    if (!doc.date) return true;
+                    let docDateParts = doc.date.split('T')[0].split('-');
+                    let docYear = docDateParts[0];
+                    let docMonthYear = `${docDateParts[0]}-${docDateParts[1]}`;
+
+                    let matchType = (criteria.type === 'ALL' || doc.type === criteria.type);
+                    if (!matchType) return true;
+
+                    if (criteria.mode === 'YEAR' && docYear === String(criteria.year)) return false;
+                    if (criteria.mode === 'MONTH' && docMonthYear === criteria.monthYear) return false;
+                    return true;
+                });
+
+                let deletedCount = initialCount - documents.length;
+
+                if (deletedCount > 0) {
+                    filterTable();
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'ลบข้อมูลใน Neon DB สำเร็จ',
+                        text: `ลบออกไปทั้งหมด ${deletedCount} รายการ`,
+                        confirmButtonColor: '#4f46e5'
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'info',
+                        title: 'ไม่พบข้อมูลที่ตรงกับเงื่อนไข',
+                        text: 'ไม่มีรายการเอกสารที่ตรงกับหมวดหมู่และช่วงเวลาดังกล่าวในระบบ',
+                        confirmButtonColor: '#4f46e5'
+                    });
+                }
+            } catch(e) {
+                Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล', confirmButtonColor: '#4f46e5' });
+            }
+        }
+
         function deleteDoc(id) {
             Swal.fire({
                 title: 'ยืนยันการลบรายการ?',
@@ -448,7 +592,6 @@
             }).then((result) => {
                 if (result.isConfirmed) {
                     documents = documents.filter(d => d.id != id);
-                    saveToLocalStorage();
                     filterTable();
                     Swal.fire({ icon: 'success', title: 'ลบสำเร็จ!', timer: 1200, showConfirmButton: false });
                 }
